@@ -17,6 +17,25 @@ last_alert_time = None
 user_alert_status = {}  # Keeps track of users' stop status and time
 
 
+def find_current_token_price(symbol):
+    url = "https://api.binance.com/api/v3/ticker/price"
+    params = {"symbol": symbol}
+    try:
+        print(f"Fetching price for {symbol}")
+        response = requests.get(url, params=params)
+        response.raise_for_status()  # Raises an HTTPError if the status is 4xx or 5xx
+        data = response.json()
+        print(f"Price for {symbol}: {data}")
+        if not data or "price" not in data:
+            raise ValueError(
+                f"Data not available for symbol {symbol} on {datetime.now().date()}"
+            )
+        return float(data["price"])
+    except Exception as e:
+        print(f"Could not find price for {symbol} on {datetime.now().date()}")
+        raise e
+
+
 # Query CoinMarketCap API
 def get_fear_and_greed():
     url = "https://pro-api.coinmarketcap.com/v3/fear-and-greed/latest"
@@ -40,7 +59,11 @@ async def send_alert(context: ContextTypes.DEFAULT_TYPE):
     print(f"Value: {value}")
     print(f"Update time: {update_time}")
 
-    if value_classification in ["Extreme Fear", "Fear", "Neutral"]:
+    # Find current price of token
+    eth_price = find_current_token_price("ETHUSDT")
+    sol_price = find_current_token_price("SOLUSDT")
+
+    if value_classification in ["Extreme Fear", "Fear"]:
         print(f"Sending alert to users: {user_alert_status}")
         for user_id in user_alert_status:
             if not user_alert_status[user_id]["stop_notifications"]:
@@ -48,9 +71,12 @@ async def send_alert(context: ContextTypes.DEFAULT_TYPE):
                     chat_id=user_id,
                     text=(
                         f"🚨 Fear & Greed Index Alert 🚨\n"
-                        f"Value classification: {value_classification}\n"
+                        f"Value classification: *{value_classification}*\n"
                         f"Value: {value}\n"
-                        f"Update time: {update_time} ⏰\n"
+                        f"Update time: {datetime.strptime(update_time, '%Y-%m-%dT%H:%M:%S.%fZ').strftime('%Y-%m-%d %H:%M:%S')} ⏰\n"
+                        f"\n"
+                        f"ETH Price: *{eth_price}* USD\n"
+                        f"SOL Price: *{sol_price}* USD\n"
                         f"\n"
                         f"Use /stop 12h or /stop 1d to stop alerts for 12 hours or 1 day"
                     ),
