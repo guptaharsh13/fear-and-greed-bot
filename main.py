@@ -4,6 +4,10 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import os
+import asyncio
+from fastapi import FastAPI
+import uvicorn
+from threading import Thread
 
 load_dotenv()
 
@@ -59,11 +63,10 @@ async def send_alert(context: ContextTypes.DEFAULT_TYPE):
     print(f"Value: {value}")
     print(f"Update time: {update_time}")
 
-    # Find current price of token
-    eth_price = find_current_token_price("ETHUSDT")
-    sol_price = find_current_token_price("SOLUSDT")
-
     if value_classification in ["Extreme Fear", "Fear"]:
+        eth_price = find_current_token_price("ETHUSDT")
+        sol_price = find_current_token_price("SOLUSDT")
+
         print(f"Sending alert to users: {user_alert_status}")
         for user_id in user_alert_status:
             if not user_alert_status[user_id]["stop_notifications"]:
@@ -132,16 +135,23 @@ async def check_resume_notifications(context: ContextTypes.DEFAULT_TYPE):
             )
 
 
-# Function to start the bot
-def main():
-    # Create the Application and pass it your bot's token
-    application = Application.builder().token(TELEGRAM_API_TOKEN).build()
+app = FastAPI()
 
-    # Add handlers
+
+@app.get("/")
+async def health_check():
+    return {"status": "healthy"}
+
+
+def run_fastapi():
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+def main():
+    application = Application.builder().token(TELEGRAM_API_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("stop", stop_alert))
 
-    # Add job queue
     job_queue = application.job_queue
     if job_queue is not None:
         job_queue.run_repeating(
@@ -156,6 +166,11 @@ def main():
         )
 
     print("Starting bot")
+    # Start FastAPI server in a separate thread
+    fastapi_thread = Thread(target=run_fastapi)
+    fastapi_thread.daemon = True
+    fastapi_thread.start()
+
     # Start the bot
     application.run_polling()
 
