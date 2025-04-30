@@ -4,7 +4,6 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import os
-import asyncio
 from fastapi import FastAPI
 import uvicorn
 from threading import Thread
@@ -144,7 +143,7 @@ async def health_check():
 
 
 def run_fastapi():
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=os.getenv("PORT", 8000))
 
 
 def main():
